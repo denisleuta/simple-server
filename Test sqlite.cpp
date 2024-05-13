@@ -11,6 +11,7 @@ using ip::tcp;
 bool stop_game_flag = false;
 bool start_game_flag = false;
 
+std::mutex start_game_mutex;
 std::mutex stop_game_mutex; 
 
 // Функция для выполнения запросов SELECT к базе данных SQLite
@@ -105,7 +106,7 @@ void handle_connection(tcp::socket socket) {
             else {
                 std::string request(buf.data(), len);
                 std::cout << "Принято от клиента: " << request << std::endl;
-
+                
                 if (request == "START_GAME") {
                     std::cout << "Запуск игры..." << std::endl;
                     std::cout << "Игра успешно запущена" << std::endl;
@@ -113,9 +114,9 @@ void handle_connection(tcp::socket socket) {
                     write(socket, buffer(response));
                     game.start_game();
                     std::cout << "Игра завершена\n";
-                    std::string response1 = "Игра успешно завершена\n"; 
-                    write(socket, buffer(response1));
                 }
+
+
                 else if (request == "OFF_SERVER") {
                     std::cout << "Завершение работы сервера..." << std::endl;
                     std::string response = "Сервер завершает работу\n";
@@ -148,6 +149,8 @@ void handle_connection(tcp::socket socket) {
                 }
                 else {
                     std::cout << "Введен несуществующий запрос " << std::endl;
+                    std::string response = "Введен несуществующий запрос\n";
+                    write(socket, buffer(response));
                 }
             }
         }
