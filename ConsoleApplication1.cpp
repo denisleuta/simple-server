@@ -14,7 +14,7 @@ int main() {
         socket.connect(tcp::endpoint(ip::address::from_string("127.0.0.1"), 9999));
 
         //Для пользователей других пк
-        //socket.connect(tcp::endpoint(ip::address::from_string("172.23.100.47"), 9999));
+        //socket.connect(tcp::endpoint(ip::address::from_string("172.23.100.47"), 9999)); Нужно ввести ip адрес устройства с которого запустили сервер
 
         std::cout << "Подключение к серверу успешно" << std::endl;
 
