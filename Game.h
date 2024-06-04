@@ -14,10 +14,18 @@
 #include "Obstacle.h"
 #include "SnakeGames.h"
 #include "Timer.h"
+#include <boost/asio.hpp>
+
+void send_results_to_server(const std::string& playerName, int score);
+
 class Game {
+private:
+    static bool game_running;
+    static int score;
+    
 public:
-	static void start_game();
-	static void stop_game();
- 
+    static void start_game();
+    static void stop_game();
+    static int getScore();
+    static std::string playerName;
 };
-void execute_sql_update(const std::string& sql);
