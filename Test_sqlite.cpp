@@ -3,18 +3,18 @@
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <sqlite3.h>
-#include "Game.h"
 #include <string>
 
 using namespace boost::asio;
 using ip::tcp;
+
 bool stop_game_flag = false;
 bool start_game_flag = false;
 
 std::mutex start_game_mutex;
-std::mutex stop_game_mutex; 
+std::mutex stop_game_mutex;
 
-// Функция для выполнения запросов SELECT к базе данных SQLite
+// SQL-запрос SELECT
 std::vector<std::string> execute_sql_select(const std::string& sql) {
     std::vector<std::string> results;
 
@@ -63,12 +63,12 @@ std::vector<std::string> execute_sql_select(const std::string& sql) {
     return results;
 }
 
+// Функция для выполнения SQL-запроса DELETE
 void execute_sql_update(const std::string& sql) {
     sqlite3* db;
     char* zErrMsg = nullptr;
     int rc;
 
-    // Открыть соединение с базой данных SQLite
     rc = sqlite3_open("database.bd", &db);
 
     if (rc) {
@@ -87,9 +87,8 @@ void execute_sql_update(const std::string& sql) {
     sqlite3_close(db);
 }
 
-
+// Функция для обработки подключения клиента к серверу
 void handle_connection(tcp::socket socket) {
-    Game game;
     try {
         while (true) {
             std::array<char, 128> buf;
@@ -106,17 +105,12 @@ void handle_connection(tcp::socket socket) {
             else {
                 std::string request(buf.data(), len);
                 std::cout << "Принято от клиента: " << request << std::endl;
-                
-                if (request == "START_GAME") {
-                    std::cout << "Запуск игры..." << std::endl;
-                    std::cout << "Игра успешно запущена" << std::endl;
-                    std::string response = "Игра успешно запущена\n"; 
-                    write(socket, buffer(response));
-                    game.start_game();
-                    std::cout << "Игра завершена\n";
-                }
 
-
+                 if (request == "START_GAME") {
+                    std::cout << "Sending command to start the game to the client...\n";
+                    std::string response = "START_GAME\n";
+                    boost::asio::write(socket, boost::asio::buffer(response));
+                 }
                 else if (request == "OFF_SERVER") {
                     std::cout << "Завершение работы сервера..." << std::endl;
                     std::string response = "Сервер завершает работу\n";
@@ -136,6 +130,28 @@ void handle_connection(tcp::socket socket) {
                     write(socket, buffer(response));
                     std::cout << "Результаты отправлены клиенту" << std::endl;
                 }
+                else if (request.find("ADD_RESULT") == 0) {
+                     size_t pos = request.find(" ");
+                     if (pos != std::string::npos) {
+                         std::istringstream iss(request.substr(pos + 1));
+                         std::string playerName;
+                         int score;
+                         if (iss >> playerName >> score) {
+                             std::string sql = "INSERT INTO results (name, result) VALUES ('" + playerName + "', " + std::to_string(score) + ")";
+                             execute_sql_update(sql);
+                             std::string response = "Результат успешно добавлен в базу данных\n";
+                             write(socket, buffer(response));
+                         }
+                         else {
+                             std::string response = "Ошибка при чтении данных\n";
+                             write(socket, buffer(response));
+                         }
+                     }
+                     else {
+                         std::string response = "Неверный формат запроса\n";
+                         write(socket, buffer(response));
+                     }
+                 }
                 else if (request == "CLEAR_RESULTS") {
                     std::cout << "Очистка базы данных от результатов..." << std::endl;
 
@@ -155,8 +171,7 @@ void handle_connection(tcp::socket socket) {
             }
         }
     }
-     catch (std::exception& e) {
-        std::cerr << "Ошибка при обработке соединения: " << e.what() << std::endl;
+    catch (std::exception& e) {
     }
 }
 
@@ -165,17 +180,20 @@ int main() {
     try {
         boost::asio::io_context io_context;
 
-        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), 9999)); 
+        // Создание акцептора для принятия входящих соединений
+        tcp::acceptor acceptor(io_context, tcp::endpoint(tcp::v4(), 9999));
         acceptor.set_option(tcp::acceptor::reuse_address(true));
 
         std::cout << "Сервер запущен. Ожидание подключений..." << std::endl;
 
+        // Принятие и обработка входящих соединений
         while (true) {
             tcp::socket socket(io_context);
             acceptor.accept(socket);
 
             std::cout << "Принято новое соединение" << std::endl;
 
+            // Запуск обработчика для каждого соединения в отдельном потоке
             std::thread(handle_connection, std::move(socket)).detach();
         }
     }
